@@ -1,36 +1,25 @@
-name: NodeGoat Vorpal Security Analysis
+name: Vorpal SAST Scan
 
 on:
   push:
-    branches: [ "main", "master" ]
+    branches:
+      - main
   pull_request:
-    branches: [ "main", "master" ]
 
 jobs:
   vorpal-scan:
     runs-on: ubuntu-latest
-    
+
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        
-      # Find all JavaScript files dynamically
-      - name: Find JavaScript files
-        id: find-js-files
-        run: |
-          # Find all .js files, exclude node_modules, format as comma-separated
-          JS_FILES=$(find . -name "*.js" -not -path "./node_modules/*" -not -path "./coverage/*" -not -path "./logs/*" | tr '\n' ',' | sed 's/,$//')
-          echo "js_files=$JS_FILES" >> $GITHUB_OUTPUT
-          echo "Found files: $JS_FILES"
-        
-      # Run Vorpal on discovered files
-      - name: Vorpal Security Scan
-        if: steps.find-js-files.outputs.js_files != ''
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Run Vorpal Scan
         uses: checkmarx/vorpal-reviewdog-github-action@v1.2.0
         with:
-          source_path: "${{ steps.find-js-files.outputs.js_files }}"
+          source_path: app/routes
           github_token: ${{ secrets.GITHUB_TOKEN }}
           reporter: github-pr-review
           level: warning
-          fail_on_error: false
+          fail_on_error: true
           filter_mode: file
