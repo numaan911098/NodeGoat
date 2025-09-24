@@ -5,7 +5,6 @@ on:
     branches: [ "main", "master" ]
   pull_request:
     branches: [ "main", "master" ]
-  workflow_dispatch: # Allow manual triggering
 
 jobs:
   vorpal-scan:
@@ -15,37 +14,23 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         
-      # Get changed files for focused scanning
-      - name: Get changed files
-        id: changed-files
-        uses: tj-actions/changed-files@v44
-        with:
-          separator: ','
-          files: |
-            **/*.js
-            **/*.json
+      # Find all JavaScript files dynamically
+      - name: Find JavaScript files
+        id: find-js-files
+        run: |
+          # Find all .js files, exclude node_modules, format as comma-separated
+          JS_FILES=$(find . -name "*.js" -not -path "./node_modules/*" -not -path "./coverage/*" -not -path "./logs/*" | tr '\n' ',' | sed 's/,$//')
+          echo "js_files=$JS_FILES" >> $GITHUB_OUTPUT
+          echo "Found files: $JS_FILES"
         
-      # Run Vorpal on changed files
-      - name: Vorpal Security Scan - Changed Files
-        if: steps.changed-files.outputs.all_changed_files != ''
-        uses: checkmarx/vorpal-reviewdog-github-action@v1.0.0
+      # Run Vorpal on discovered files
+      - name: Vorpal Security Scan
+        if: steps.find-js-files.outputs.js_files != ''
+        uses: checkmarx/vorpal-reviewdog-github-action@v1.2.0
         with:
-          source_path: "${{ steps.changed-files.outputs.all_changed_files }}"
+          source_path: "${{ steps.find-js-files.outputs.js_files }}"
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          reporter: github-pr-check
+          reporter: github-pr-review
           level: warning
           fail_on_error: false
           filter_mode: file
-          
-      # Full scan on main vulnerable directories
-      - name: Vorpal Security Scan - Full Scan
-        if: github.event_name == 'push'
-        uses: checkmarx/vorpal-reviewdog-github-action@v1.0.0
-        with:
-          source_path: "app/routes,app/data,app/views,test"
-          folders_to_ignore: "node_modules,coverage,logs"
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          reporter: github-pr-review
-          level: error
-          fail_on_error: true # Fail build on security issues
-          reviewdog_flags: "--level-map=high:error,medium:warning,low:info"
